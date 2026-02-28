@@ -1,5 +1,5 @@
 import axios from 'axios';
-
-export default axios.create({
-  baseURL: 'http://localhost:3000' // temporary, will update after backend deploy
+const api = axios.create({
+  baseURL: 'https://mood-tracker-backend-1.onrender.com'
 });
+export default api;

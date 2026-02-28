@@ -1,87 +1,66 @@
-<template>
-  <div class="mood-form">
-    <h2>Mood Check-in</h2>
-    <input v-model="name" placeholder="Your name" />
-    <textarea v-model="mood" placeholder="How are you feeling today?"></textarea>
-    <button @click="submitMood">Submit</button>
+<script setup>
+import { ref, onMounted } from 'vue';
 
-    <p v-if="aiMessage" class="ai-response">
-      AI Advisor: {{ aiMessage }}
-    </p>
+// Your live Render URL
+const API_BASE_URL = "https://mood-tracker-backend-1.onrender.com";
 
-    <h3>Mood History</h3>
-    <ul>
-      <li v-for="m in moods" :key="m.id">
-        <strong>{{ m.full_name }}</strong>: {{ m.mood_text }}
-        <em>({{ formatDate(m.created_at) }})</em>
-      </li>
-    </ul>
-  </div>
-</template>
+const name = ref("");
+const mood = ref("");
+const aiMessage = ref("");
+const moods = ref([]);
+const loading = ref(false);
 
-<script>
-import api from '../services/api.js';
-
-export default {
-  name: 'MoodForm',
-  data() {
-    return {
-      name: '',
-      mood: '',
-      aiMessage: '',
-      moods: []
-    };
-  },
-  methods: {
-    async submitMood() {
-      try {
-        const res = await api.post('/mood', {
-          full_name: this.name,
-          mood_text: this.mood
-        });
-        this.aiMessage = res.data.ai_message; // show AI advice
-        this.fetchMoods(); // refresh history
-        this.mood = ''; // clear input
-      } catch (err) {
-        console.error(err);
-        this.aiMessage = "Server error – please try again later.";
-      }
-    },
-    async fetchMoods() {
-      try {
-        const res = await api.get('/mood');
-        this.moods = res.data;
-      } catch (err) {
-        console.error(err);
-      }
-    },
-    formatDate(dateString) {
-      const d = new Date(dateString);
-      return d.toLocaleString();
+// 1. Get Mood History (GET)
+const fetchMoods = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/mood`);
+    if (res.ok) {
+      moods.ref = await res.json();
     }
-  },
-  mounted() {
-    this.fetchMoods(); // load history on page load
+  } catch (err) {
+    console.error("Failed to load history:", err);
   }
 };
-</script>
 
-<style scoped>
-.mood-form {
-  max-width: 500px;
-  margin: auto;
-  padding: 1rem;
-}
-.ai-response {
-  margin-top: 1rem;
-  font-style: italic;
-  color: #2c3e50;
-}
-ul {
-  margin-top: 1rem;
-  padding-left: 1rem;
-}
-li {
-  margin-bottom: 0.5rem;
-}
-</style>
+// 2. Submit New Mood (POST)
+const submitMood = async () => {
+  if (!name.value || !mood.value) {
+    alert("Please fill in both fields!");
+    return;
+  }
+
+  loading.value = true;
+  aiMessage.value = "";
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/mood`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: name.value,
+        mood_text: mood.value
+      })
+    });
+
+    const data = await res.json();
+    
+    if (res.ok) {
+      aiMessage.value = data.ai_message;
+      // Clear inputs
+      mood.value = "";
+      // Refresh the history list
+      await fetchMoods();
+    } else {
+      alert("Error: " + data.error);
+    }
+  } catch (err) {
+    console.error("Submission failed:", err);
+    alert("Could not connect to the server. It might be 'sleeping' on Render—wait 30 seconds and try again.");
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Load history when the page opens
+onMounted(fetchMoods);
+</script>
